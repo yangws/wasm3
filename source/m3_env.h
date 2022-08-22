@@ -21,16 +21,19 @@ typedef struct M3MemoryInfo
 {
     u32     initPages;
     u32     maxPages;
+    cstr_t  exportName;
 }
 M3MemoryInfo;
 
-
 typedef struct M3Memory
 {
-    M3MemoryHeader *        mallocated;
+    M3MemoryBuffer *        mallocated;
 
     u32                     numPages;
     u32                     maxPages;
+    
+    bool                    isImported;  // 该参数为 true 时，代表 mallocated->dataBuffer 指向的内存为 M3 外部分配
+    IM3MemToGrowCallback    memToGrowCallback;
 }
 M3Memory;
 

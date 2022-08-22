@@ -137,6 +137,12 @@ typedef struct M3MemoryHeader
 }
 M3MemoryHeader;
 
+typedef struct M3MemoryBuffer {
+    M3MemoryHeader   header;
+    uint8_t *        dataBuffer;
+}
+M3MemoryBuffer;
+
 struct M3CodeMappingPage;
 
 typedef struct M3CodePageHeader
