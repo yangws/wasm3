@@ -693,11 +693,22 @@ d_m3Op  (MemGrow)
     if (M3_LIKELY(numPagesToGrow))
     {
         u32 requiredPages = memory->numPages + numPagesToGrow;
-
-        M3Result r = ResizeMemory (runtime, requiredPages);
-        if (r)
-            _r0 = -1;
-
+        if (runtime->memory.isImported) {
+            if (runtime->memory.memToGrowCallback) {
+                int originalPage = runtime->memory.memToGrowCallback(&runtime->memory, numPagesToGrow, runtime->userdata);
+                if (_r0 != originalPage) {
+                    _r0 = -1;
+                }
+            } else {
+                m3log(runtime, "operation memory.grow memToGrowCallback missing.");
+                _r0 = -1;
+            }
+        } else {
+            M3Result r = ResizeMemory (runtime, requiredPages);
+            if (r) {
+                _r0 = -1;
+            }
+        }
         _mem = memory->mallocated;
     }
 

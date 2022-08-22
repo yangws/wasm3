@@ -105,6 +105,12 @@ typedef struct M3ImportContext
 }
 M3ImportContext, * IM3ImportContext;
 
+struct M3Memory;
+typedef struct M3Memory * IM3Memory;
+
+// 参数 userdata 为 m3_NewRuntime 传入的 userdata
+typedef int (*IM3MemToGrowCallback)(IM3Memory memory, uint32_t pagesToGrow, void *userdata);
+
 // -------------------------------------------------------------------------------------------------------------------------------
 //  error codes
 // -------------------------------------------------------------------------------------------------------------------------------
@@ -217,6 +223,8 @@ d_m3ErrorConst  (trapStackOverflow,             "[trap] stack overflow")
 
     void *              m3_GetUserData              (IM3Runtime             i_runtime);
 
+    void                m3_SetMemToGrowCallback     (IM3Runtime             i_runtime,
+                                                     IM3MemToGrowCallback   memToGrowCallback);
 
 //-------------------------------------------------------------------------------------------------------------------------------
 //  modules

@@ -188,6 +188,14 @@ IM3Runtime  m3_NewRuntime  (IM3Environment i_environment, u32 i_stackSizeInBytes
             runtime->numStackSlots = i_stackSizeInBytes / sizeof (m3slot_t);         m3log (runtime, "new stack: %p", runtime->stack);
         }
         else m3_Free (runtime);
+        
+        runtime->memory.mallocated = m3_Malloc("Wasm Memory", sizeof(M3MemoryBuffer));
+        if (runtime->memory.mallocated) {
+            memset(runtime->memory.mallocated, 0, sizeof(M3MemoryBuffer));
+        } else {
+            m3_Free(runtime->stack);
+            m3_Free(runtime);
+        }
     }
 
     return runtime;
@@ -198,6 +206,9 @@ void *  m3_GetUserData  (IM3Runtime i_runtime)
     return i_runtime ? i_runtime->userdata : NULL;
 }
 
+void m3_SetMemToGrowCallback(IM3Runtime i_runtime, IM3MemToGrowCallback memToGrowCallback) {
+    i_runtime->memory.memToGrowCallback = memToGrowCallback;
+}
 
 void *  ForEachModule  (IM3Runtime i_runtime, ModuleVisitor i_visitor, void * i_info)
 {
@@ -234,7 +245,11 @@ void  Runtime_Release  (IM3Runtime i_runtime)
     Environment_ReleaseCodePages (i_runtime->environment, i_runtime->pagesFull);
 
     m3_Free (i_runtime->stack);
-    m3_Free (i_runtime->memory.mallocated);
+    if (!i_runtime->memory.isImported
+        && (i_runtime->memory.mallocated && i_runtime->memory.mallocated->dataBuffer)) {
+        m3_Free (i_runtime->memory.mallocated->dataBuffer);
+    }
+    m3_Free(i_runtime->memory.mallocated);
 }
 
 
@@ -374,29 +389,24 @@ M3Result  ResizeMemory  (IM3Runtime io_runtime, u32 i_numPages)
             numPageBytes = M3_MIN (numPageBytes, io_runtime->memoryLimit);
         }
 
-        size_t numBytes = numPageBytes + sizeof (M3MemoryHeader);
-
         size_t numPreviousBytes = memory->numPages * d_m3MemPageSize;
-        if (numPreviousBytes)
-            numPreviousBytes += sizeof (M3MemoryHeader);
 
-        void* newMem = m3_Realloc ("Wasm Linear Memory", memory->mallocated, numBytes, numPreviousBytes);
+        void* newMem = m3_Realloc ("Wasm Linear Memory", memory->mallocated->dataBuffer, numPageBytes, numPreviousBytes);
         _throwifnull(newMem);
 
-        memory->mallocated = (M3MemoryHeader*)newMem;
+        memory->mallocated->dataBuffer = (M3MemoryHeader*)newMem;
 
 # if d_m3LogRuntime
-        M3MemoryHeader * oldMallocated = memory->mallocated;
+        void * oldMallocated = memory->mallocated->dataBuffer;
 # endif
 
         memory->numPages = numPagesToAlloc;
 
-        memory->mallocated->length =  numPageBytes;
-        memory->mallocated->runtime = io_runtime;
+        memory->mallocated->header.length =  numPageBytes;
+        memory->mallocated->header.runtime = io_runtime;
+        memory->mallocated->header.maxStack = (m3slot_t *) io_runtime->stack + io_runtime->numStackSlots;
 
-        memory->mallocated->maxStack = (m3slot_t *) io_runtime->stack + io_runtime->numStackSlots;
-
-        m3log (runtime, "resized old: %p; mem: %p; length: %zu; pages: %d", oldMallocated, memory->mallocated, memory->mallocated->length, memory->numPages);
+        m3log (runtime, "resized old: %p; mem: %p; length: %zu; pages: %d", oldMallocated, memory->mallocated->dataBuffer, memory->mallocated->header.length, memory->numPages);
     }
     else result = m3Err_wasmMemoryOverflow;
 
@@ -449,7 +459,7 @@ M3Result  InitDataSegments  (M3Memory * io_memory, IM3Module io_module)
 {
     M3Result result = m3Err_none;
 
-    _throwif ("unallocated linear memory", !(io_memory->mallocated));
+    _throwif ("unallocated linear memory", !(io_memory->mallocated->dataBuffer));
 
     for (u32 i = 0; i < io_module->numDataSegments; ++i)
     {
@@ -461,7 +471,7 @@ _       (EvaluateExpression (io_module, & segmentOffset, c_m3Type_i32, & start, 
 
         m3log (runtime, "loading data segment: %d; size: %d; offset: %d", i, segment->size, segmentOffset);
 
-        if (segmentOffset >= 0 && (size_t)(segmentOffset) + segment->size <= io_memory->mallocated->length)
+        if (segmentOffset >= 0 && (size_t)(segmentOffset) + segment->size <= io_memory->mallocated->header.length)
         {
             u8 * dest = m3MemData (io_memory->mallocated) + segmentOffset;
             memcpy (dest, segment->data, segment->size);
@@ -567,7 +577,7 @@ _           (CompileFunction (function));
         startFunctionTmp = io_module->startFunction;
         io_module->startFunction = -1;
 
-        result = (M3Result) RunCode (function->compiled, (m3stack_t) runtime->stack, runtime->memory.mallocated, d_m3OpDefaultArgs);
+        result = (M3Result) RunCode (function->compiled, (m3stack_t) runtime->stack, (M3MemoryHeader *)runtime->memory.mallocated, d_m3OpDefaultArgs);
 
         if (result)
         {
@@ -1145,7 +1155,7 @@ uint8_t *  m3_GetMemory  (IM3Runtime i_runtime, uint32_t * o_memorySizeInBytes, 
 
     if (i_runtime)
     {
-        u32 size = (u32) i_runtime->memory.mallocated->length;
+        u32 size = (u32) i_runtime->memory.mallocated->header.length;
 
         if (o_memorySizeInBytes)
             * o_memorySizeInBytes = size;
@@ -1160,7 +1170,7 @@ uint8_t *  m3_GetMemory  (IM3Runtime i_runtime, uint32_t * o_memorySizeInBytes, 
 
 uint32_t  m3_GetMemorySize  (IM3Runtime i_runtime)
 {
-    return i_runtime->memory.mallocated->length;
+    return i_runtime->memory.mallocated->header.length;
 }
 
 
