@@ -41,6 +41,7 @@ void  m3_FreeModule  (IM3Module i_module)
         }
         m3_Free (i_module->globals);
         m3_Free (i_module->memoryInfo.exportName);
+        FreeImportInfo(&(i_module->memoryInfo.import));
 
         m3_Free (i_module);
     }

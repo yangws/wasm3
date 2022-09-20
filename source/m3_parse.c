@@ -197,6 +197,8 @@ _                   (ReadLEB_u32 (& maxSize, & i_bytes, i_end));
             {
 _               (ParseType_Memory (& io_module->memoryInfo, & i_bytes, i_end));
                 io_module->memoryImported = true;
+                io_module->memoryInfo.import = import;
+                import = clearImport;
             }
             break;
 

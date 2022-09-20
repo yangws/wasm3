@@ -22,6 +22,7 @@ typedef struct M3MemoryInfo
     u32     initPages;
     u32     maxPages;
     cstr_t  exportName;
+    M3ImportInfo import;
 }
 M3MemoryInfo;
 
