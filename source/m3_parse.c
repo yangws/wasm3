@@ -177,13 +177,28 @@ _               (Module_AddFunction (io_module, typeIndex, & import))
             break;
 
             case d_externalKind_table:
-//                  result = ParseType_Table (& i_bytes, i_end);
+            {
+                i8 waType;
+                u8 flag;
+                u32 initSize, maxSize;
+
+_               (ReadLEB_i7 (& waType, & i_bytes, i_end));
+_               (ReadLEB_u7 (& flag, & i_bytes, i_end));
+_               (ReadLEB_u32 (& initSize, & i_bytes, i_end));
+
+                maxSize = 0;
+                if (flag) {
+_                   (ReadLEB_u32 (& maxSize, & i_bytes, i_end));
+                }
+            }
                 break;
 
             case d_externalKind_memory:
             {
 _               (ParseType_Memory (& io_module->memoryInfo, & i_bytes, i_end));
                 io_module->memoryImported = true;
+                io_module->memoryInfo.import = import;
+                import = clearImport;
             }
             break;
 

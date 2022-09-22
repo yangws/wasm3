@@ -391,10 +391,16 @@ M3Result  ResizeMemory  (IM3Runtime io_runtime, u32 i_numPages)
 
         size_t numPreviousBytes = memory->numPages * d_m3MemPageSize;
 
-        void* newMem = m3_Realloc ("Wasm Linear Memory", memory->mallocated->dataBuffer, numPageBytes, numPreviousBytes);
-        _throwifnull(newMem);
+        if (numPageBytes > 0) {
+            void* newMem = m3_Realloc ("Wasm Linear Memory", memory->mallocated->dataBuffer, numPageBytes, numPreviousBytes);
+            _throwifnull(newMem);
 
-        memory->mallocated->dataBuffer = (M3MemoryHeader*)newMem;
+            memory->mallocated->dataBuffer = (uint8_t *)newMem;
+        } else {
+            if (memory->mallocated->dataBuffer) {
+                m3_Free (memory->mallocated->dataBuffer);
+            }
+        }
 
 # if d_m3LogRuntime
         void * oldMallocated = memory->mallocated->dataBuffer;
@@ -458,8 +464,6 @@ M3Result  InitGlobals  (IM3Module io_module)
 M3Result  InitDataSegments  (M3Memory * io_memory, IM3Module io_module)
 {
     M3Result result = m3Err_none;
-
-    _throwif ("unallocated linear memory", !(io_memory->mallocated->dataBuffer));
 
     for (u32 i = 0; i < io_module->numDataSegments; ++i)
     {
