@@ -260,6 +260,8 @@ _       (ReadLEB_u32 (& index, & i_bytes, i_end));                              
             {
                 func->names[func->numNames++] = utf8;
                 utf8 = NULL; // ownership transferred to M3Function
+            } else {
+                _throw("too many duplicate export functions.");
             }
         }
         else if (exportKind == d_externalKind_global)
